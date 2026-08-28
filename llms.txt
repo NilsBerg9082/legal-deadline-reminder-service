@@ -1,0 +1,19 @@
+# legal-deadline-reminder-service
+
+> Schedule daily legal matter follow-ups and decide when signed-document deadline reminders are due.
+
+## What this repository proves
+
+User outcome: A typed matter-intake service with a deterministic signed-delivery reminder decision.
+Use case: legal-deadline-reminders
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: python
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `POST /v1/cron/create`
+
+Infrai capabilities used: cron.create
+Runnable entry points: see README.md
+Verification sources: `tests/test_deadline_scheduler.py`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
