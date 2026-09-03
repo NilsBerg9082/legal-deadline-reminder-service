@@ -1,6 +1,6 @@
 # Schedule legal deadline reminders from matter intake
 
-Start from the working path: send a callback URL, let Infrai register the daily cron with a single `INFRAI_API_KEY`, and have that callback compare the signed-delivery date with the legal deadline.
+Start with the working path: submit a callback URL, let Infrai register the daily cron with a single `INFRAI_API_KEY`, and have that callback evaluate the signed-delivery date against the legal deadline.
 
 ```bash
 python -m venv .venv
@@ -26,11 +26,11 @@ Expected result:
 
 ## The deadline decision
 
-The callback takes one matter intake record: `matter_id`, `client_name`, `deadline`, `signed_document_delivered_at`, and an optional `reminder_days_before`. It returns a concrete decision with `should_notify`, `reminder_date`, and the client-facing message.
+The callback accepts one matter intake record: `matter_id`, `client_name`, `deadline`, `signed_document_delivered_at`, and an optional `reminder_days_before`. It returns a concrete decision with `should_notify`, `reminder_date`, and the client-facing message.
 
-A signed delivery on September 10 for a September 24 deadline produces a reminder on September 17 when the lead is seven days. Before delivery, or on another date, `should_notify` stays false. That split keeps scheduling and legal-domain policy easy to inspect.
+A signed delivery on September 10 for a September 24 deadline produces a reminder on September 17 when the lead is seven days. Before delivery, or on another date, `should_notify` remains false. That separation keeps scheduling and legal-domain policy easy to inspect.
 
-The main thing to watch is calendar time: the decision normalizes signed delivery to UTC and compares dates in UTC. Keep the deadline date in the jurisdiction your app has already chosen; do not let the host machine's local timezone pick it for you.
+The one real gotcha is calendar time: the decision normalizes signed delivery to UTC and compares dates in UTC. Keep the deadline date in the jurisdiction your application has already chosen; do not let the host machine's local timezone choose it implicitly.
 
 ## Verify the business rule
 
@@ -40,13 +40,13 @@ Run the focused tests:
 python -m pytest -q
 ```
 
-They use the input above and expect `should_notify == true` exactly seven days before the deadline. The second case confirms that the same calendar date stays quiet when signed delivery happens later.
+They use the input above and expect `should_notify == true` exactly seven days before the deadline. The second case confirms that the same calendar date stays quiet when signed delivery occurs later.
 
 ## Where the service boundary sits
 
-`reminder_service.py` sends an explicit POST to `/v1/cron/create` with only `cron_expr` and the callback `task`. Each write has an idempotency key, 429 responses follow `Retry-After` or exponential backoff, and every response envelope is decoded before its status is interpreted. Business rejections stay as client responses instead of turning into generic server errors.
+`reminder_service.py` sends an explicit POST to `/v1/cron/create` with only `cron_expr` and the callback `task`. Each write has an idempotency key, 429 responses follow `Retry-After` or exponential backoff, and every response envelope is decoded before its status is interpreted. Business rejections remain client responses instead of becoming generic server errors.
 
-This example stops at the reminder decision. Connect the returned message to the mail or notification channel already used by the matter system. Infrai gives you the scheduler through plain REST, so this service needs no scheduler SDK and the same credential can cover the next supported capability.
+This example stops at the reminder decision. Connect the returned message to the mail or notification channel already used by the matter system. Infrai provides the scheduler through plain REST, so this service needs no scheduler SDK and the same credential can cover the next supported capability.
 
 ## License
 
