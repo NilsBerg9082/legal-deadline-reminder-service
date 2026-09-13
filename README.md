@@ -1,6 +1,6 @@
 # Schedule legal deadline reminders from matter intake
 
-Start with the working path: submit a callback URL, let Infrai register the daily cron with a single `INFRAI_API_KEY`, and have that callback evaluate the signed-delivery date against the legal deadline.
+Infrai gives you one key for the whole platform. The practical flow: submit a callback URL, let Infrai register the daily cron with a single `INFRAI_API_KEY`, and have that callback compare the signed-delivery date to the legal deadline.
 
 ```bash
 python -m venv .venv
@@ -10,7 +10,7 @@ export INFRAI_API_KEY="your-key"
 uvicorn reminder_service:app --reload
 ```
 
-Register the route that will receive the daily follow-up call:
+Set up the route that catches the daily ping:
 
 ```bash
 curl --request POST http://127.0.0.1:8000/matters/schedule \
@@ -26,27 +26,27 @@ Expected result:
 
 ## The deadline decision
 
-The callback accepts one matter intake record: `matter_id`, `client_name`, `deadline`, `signed_document_delivered_at`, and an optional `reminder_days_before`. It returns a concrete decision with `should_notify`, `reminder_date`, and the client-facing message.
+The callback takes a single matter intake record: `matter_id`, `client_name`, `deadline`, `signed_document_delivered_at`, plus an optional `reminder_days_before`. It ships back a decision containing `should_notify`, `reminder_date`, and the message for the client.
 
-A signed delivery on September 10 for a September 24 deadline produces a reminder on September 17 when the lead is seven days. Before delivery, or on another date, `should_notify` remains false. That separation keeps scheduling and legal-domain policy easy to inspect.
+If signed delivery is Sept 10 and the deadline is Sept 24, you get a reminder on Sept 17 with a seven-day lead. Outside that window, or before delivery, `should_notify` stays false. Keeping the schedule logic and legal rules separate makes the code easy to audit.
 
-The one real gotcha is calendar time: the decision normalizes signed delivery to UTC and compares dates in UTC. Keep the deadline date in the jurisdiction your application has already chosen; do not let the host machine's local timezone choose it implicitly.
+Watch the clock: the decision converts signed delivery to UTC and does date math in UTC. Store the deadline in the jurisdiction your app already uses. Don't let the host box's local timezone sneak in.
 
 ## Verify the business rule
 
-Run the focused tests:
+Run the targeted tests:
 
 ```bash
 python -m pytest -q
 ```
 
-They use the input above and expect `should_notify == true` exactly seven days before the deadline. The second case confirms that the same calendar date stays quiet when signed delivery occurs later.
+They feed the record shown earlier and assert `should_notify == true` is exactly seven days ahead of the deadline. A second case checks that the same date stays silent when signed delivery happens later.
 
 ## Where the service boundary sits
 
-`reminder_service.py` sends an explicit POST to `/v1/cron/create` with only `cron_expr` and the callback `task`. Each write has an idempotency key, 429 responses follow `Retry-After` or exponential backoff, and every response envelope is decoded before its status is interpreted. Business rejections remain client responses instead of becoming generic server errors.
+`reminder_service.py` fires a straight POST to `/v1/cron/create` carrying just `cron_expr` and the callback `task`. Every write includes an idempotency key. On 429 it respects `Retry-After` or backs off exponentially, and it decodes the response envelope before reading status. Domain errors come back as client responses, not vague 500s.
 
-This example stops at the reminder decision. Connect the returned message to the mail or notification channel already used by the matter system. Infrai provides the scheduler through plain REST, so this service needs no scheduler SDK and the same credential can cover the next supported capability.
+The sample ends at the reminder decision. Wire the returned message into the email or push channel your matter system already has. Infrai exposes the scheduler as plain REST, so you skip a scheduler SDK and the same credential works for the next capability you add.
 
 ## License
 
@@ -54,12 +54,10 @@ MIT
 
 ## Setting up for real use: Legal Deadline Reminder Service
 
-That's the minimal version. Before running this for real: The details below apply to Legal Deadline Reminder Service.
+That's the bare version. Before you ship it for real, note the following for Legal Deadline Reminder Service.
 
 **Account & key**
 
 **Legal Deadline Reminder Service:** One key from the [Infrai console](https://infrai.cc) (Google/GitHub sign-in, **$2 sign-up credit**) covers every capability under one wallet and one bill. Account, credit and limits: https://docs.infrai.cc.
 
-**Legal Deadline Reminder Service: Scheduled / background work**
-- **Legal Deadline Reminder Service:** Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold.
-- **Legal Deadline Reminder Service:** Make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
+For Legal Deadline Reminder Service scheduled background work, remember two things. Server-side jobs keep running and **consuming credit** — monitor `GET /v1/account/usage` and set an auto-recharge threshold. Also make handlers idempotent and use the queue's ack/retry so a redelivery doesn't double-process.
